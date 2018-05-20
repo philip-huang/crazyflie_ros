@@ -13,6 +13,7 @@ class Crazyflie:
         self.prefix = prefix
         self.tf = tf
 
+        rospy.loginfo("Waiting for Services")
         rospy.wait_for_service(prefix + "/set_group_mask")
         self.setGroupMaskService = rospy.ServiceProxy(prefix + "/set_group_mask", SetGroupMask)
         rospy.wait_for_service(prefix + "/takeoff")
@@ -29,6 +30,7 @@ class Crazyflie:
         self.startTrajectoryService = rospy.ServiceProxy(prefix + "/start_trajectory", StartTrajectory)
         rospy.wait_for_service(prefix + "/update_params")
         self.updateParamsService = rospy.ServiceProxy(prefix + "/update_params", UpdateParams)
+        rospy.loginfo("Found All Required Services for " + self.prefix)
 
     def setGroupMask(self, groupMask):
         self.setGroupMaskService(groupMask)
@@ -77,3 +79,9 @@ class Crazyflie:
         for name, value in params.iteritems():
             rospy.set_param(self.prefix + "/" + name, value)
         self.updateParamsService(params.keys())
+
+    def reset_ekf(self):
+        self.setParam("kalman/resetEstimation", 1)
+        rospy.sleep(0.3)
+        self.setParam("kalman/resetEstimation", 0) 
+        rospy.sleep(2)

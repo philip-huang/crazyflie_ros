@@ -1,21 +1,29 @@
 <?xml version="1.0"?>
 
 <launch>
-  <arg name="uri" default="radio://0/80/2M" />
-
+  <arg name="uri" default="radio://0/80/250K/E7E7E7E7E7" />
+  <arg name="tf_prefix" default="crazyflie" />
   <include file="$(find crazyflie_driver)/launch/crazyflie_server.launch">
   </include>
 
   <group ns="crazyflie">
     <!--<param name="crazyflie/pid_rate/yaw_kp" value="200"/>-->
-    <include file="$(find crazyflie_driver)/launch/crazyflie_add.launch">
-      <arg name="uri" value="$(arg uri)" />
-      <arg name="tf_prefix" value="crazyflie" />
-      <arg name="enable_logging" value="False" />
-    </include>
-
-    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="Position.py" output="screen">
+    <node pkg="crazyflie_driver" type="crazyflie_add" name="crazyflie_add" output="screen">
+      <param name="uri" value="$(arg uri)" />
+      <param name="tf_prefix" value="$(arg tf_prefix)" /> 
+      <rosparam>
+        genericLogTopics: ["position", "ctrltarget"]
+        genericLogTopicFrequencies: [10, 10] 
+        genericLogTopic_position_Variables: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z"] 
+        genericLogTopic_ctrltarget_Variables: ["ctrltarget.x", "ctrltarget.y", "ctrltarget.z"]
+      </rosparam>
     </node>
+
+    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="test_high_level.py" output="screen">
+    </node>
+
   </group>
+
+  <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget" name="record" output="screen"/>
 
 </launch>
