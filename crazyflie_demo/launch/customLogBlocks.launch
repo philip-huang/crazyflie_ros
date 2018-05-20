@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <launch>
-  <arg name="uri" default="radio://0/80/2M" />
+  <arg name="uri" default="radio://0/80/250K/E7E7E7E7E7" />
 
   <include file="$(find crazyflie_driver)/launch/crazyflie_server.launch">
   </include>
@@ -12,13 +12,16 @@
       <param name="uri" value="$(arg uri)" />
       <param name="tf_prefix" value="crazyflie" />
       <rosparam>
-        genericLogTopics: ["log1", "log2"]
-        genericLogTopicFrequencies: [10, 100]
+        genericLogTopics: ["log1", "log2", "position"]
+        genericLogTopicFrequencies: [10, 100, 100]
         genericLogTopic_log1_Variables: ["pm.vbat"]
         genericLogTopic_log2_Variables: ["acc.x", "acc.y", "acc.z"]
+        genericLogTopic_position_Variables: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z"]
       </rosparam>
     </node>
 
-
+  <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="test_high_level.py" output="screen">
+    </node>
+    
   </group>
 </launch>
