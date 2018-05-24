@@ -7,23 +7,32 @@
   </include>
 
   <group ns="crazyflie">
-    <!--<param name="crazyflie/pid_rate/yaw_kp" value="200"/>-->
+    <!-- ADD Crazyflie -->
     <node pkg="crazyflie_driver" type="crazyflie_add" name="crazyflie_add" output="screen">
       <param name="uri" value="$(arg uri)" />
       <param name="tf_prefix" value="$(arg tf_prefix)" /> 
       <rosparam>
-        genericLogTopics: ["position", "ctrltarget"]
-        genericLogTopicFrequencies: [10, 10] 
+        genericLogTopics: ["position", "ctrltarget", "extpos"]
+        genericLogTopicFrequencies: [10, 10, 10] 
         genericLogTopic_position_Variables: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z"] 
         genericLogTopic_ctrltarget_Variables: ["ctrltarget.x", "ctrltarget.y", "ctrltarget.z"]
+        genericLogTopic_extpos_Variables: ["ext_pos.X", "ext_pos.Y", "ext_pos.Z"]
       </rosparam>
     </node>
 
-    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="test_high_level.py" output="screen">
-    </node>
+    <!--Controller Node-->
+    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="test_high_level.py" output="screen"/> 
 
   </group>
+ 
+  <!-- Ball Detection Node-->
+  <include file="$(find ball_detection)/src/ball_detection.launch">
+    <arg name="flight" value="True"/>
+  </include>
 
-  <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget" name="record" output="screen"/>
+  <!--Rosbag-->
+  <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget /crazyflie/external_position_
+  /Debug/color/image /tf"
+  name="record" output="screen"/>
 
 </launch>

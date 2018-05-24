@@ -2,25 +2,40 @@
 
 import rospy
 import crazyflie
+import estimator
 import time
 import uav_trajectory
 
-print("Hello World!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
 if __name__ == '__main__':
     rospy.init_node('test_high_level')
 
-    cf = crazyflie.Crazyflie("/crazyflie", "/vicon/crazyflie/crazyflie") 
+    cf = crazyflie.Crazyflie("/crazyflie", "/crazyflie/base_link")  
     cf.setParam("commander/enHighLevel", 1)
     cf.reset_ekf() 
 
-    cf.takeoff(targetHeight = 0.5, duration = 3.0)
+    height = 0.5
+    speed = 1.0
+    print("Requesting takeoff...")
+    cf.takeoff(targetHeight = height, duration = height * speed)
     time.sleep(5.0)
 
-    cf.land(targetHeight = 0.0, duration = 3.0)
-    time.sleep(3.0)
+    # cf.goTo([0.5, 0, height], 0, duration = 1.0)
+    # time.sleep(5.0)
+
+    # cf.goTo([0.5, 0.5, height], 0, duration = 1.0)
+    # time.sleep(5.0)
+
+    # cf.goTo([0, 0.5, height], 0, duration = 1.0)
+    # time.sleep(5.0)
+
+    # cf.goTo([0, 0, height], 0, duration = 1.0)
+    # time.sleep(5.0)
 
     cf.land(targetHeight = 0.0, duration = 2.0)
+    time.sleep(2.0)
+
+    # cf.land(targetHeight = 0.0, duration = 2.0)
 
     # traj1 = uav_trajectory.Trajectory()
     # traj1.loadcsv("takeoff.csv")

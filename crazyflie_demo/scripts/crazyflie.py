@@ -3,15 +3,16 @@
 import rospy
 import numpy as np
 from crazyflie_driver.srv import *
-from crazyflie_driver.msg import TrajectoryPolynomialPiece
+import tf
+from crazyflie_driver.msg import TrajectoryPolynomialPiece 
 
 def arrayToGeometryPoint(a):
     return geometry_msgs.msg.Point(a[0], a[1], a[2])
 
 class Crazyflie:
-    def __init__(self, prefix, tf):
+    def __init__(self, prefix, cf_frame):
         self.prefix = prefix
-        self.tf = tf
+        self.cf_frame = cf_frame
 
         rospy.loginfo("Waiting for Services")
         rospy.wait_for_service(prefix + "/set_group_mask")
@@ -31,7 +32,8 @@ class Crazyflie:
         rospy.wait_for_service(prefix + "/update_params")
         self.updateParamsService = rospy.ServiceProxy(prefix + "/update_params", UpdateParams)
         rospy.loginfo("Found All Required Services for " + self.prefix)
-
+ 
+        
     def setGroupMask(self, groupMask):
         self.setGroupMaskService(groupMask)
 
@@ -63,10 +65,13 @@ class Crazyflie:
     def startTrajectory(self, trajectoryId, timescale = 1.0, reverse = False, relative = True, groupMask = 0):
         self.startTrajectoryService(groupMask, trajectoryId, timescale, reverse, relative)
 
-    def position(self):
-        self.tf.waitForTransform("/world", "/cf" + str(self.id), rospy.Time(0), rospy.Duration(10))
-        position, quaternion = self.tf.lookupTransform("/world", "/cf" + str(self.id), rospy.Time(0))
-        return np.array(position)
+    def position(self): 
+        listener = tf.TransformListener()
+        while not listener.frameExists(self.cf_frame):  
+            continue
+        t = listener.getLatestCommonTime("/world", self.cf_frame)
+        trans, roat = listener.lookupTransform("/world", self.cf_frame, t) 
+        return np.array(trans)
 
     def getParam(self, name):
         return rospy.get_param(self.prefix + "/" + name)
@@ -84,4 +89,13 @@ class Crazyflie:
         self.setParam("kalman/resetEstimation", 1)
         rospy.sleep(0.3)
         self.setParam("kalman/resetEstimation", 0) 
-        rospy.sleep(2)
+        rospy.sleep(2) 
+        rospy.set_param("kalman/initialX", 0)
+        rospy.set_param("kalman/initialY", 0)
+        rospy.set_param("kalman/initialZ", 0)
+        self.updateParamsService(["kalman/initialX", "kalman/initialY", "kalman/initialZ"])
+
+        rospy.set_param("kalman/resetEstimation", 1)
+        # rospy.set_param("locSrv/extPosStdDev", 1e-4)
+        self.updateParamsService(["kalman/resetEstimation"]) #, "locSrv/extPosStdDev"])
+        rospy.sleep(1.0)
