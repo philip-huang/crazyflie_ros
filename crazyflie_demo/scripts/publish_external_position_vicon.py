@@ -5,6 +5,8 @@ import tf
 from geometry_msgs.msg import PointStamped, TransformStamped
 from crazyflie_driver.srv import UpdateParams, Takeoff, Land
 
+firstTransform = True
+
 def onNewTransform(transform):
     global msg
     global pub
@@ -12,8 +14,8 @@ def onNewTransform(transform):
 
     if firstTransform:
         # initialize kalman filter
-        rospy.set_param("kalman/initialX", transform.transform.translation.x)
-        rospy.set_param("kalman/initialY", transform.transform.translation.y)
+        rospy.set_param("kalman/initialX", 0)
+        rospy.set_param("kalman/initialY", 0)
         rospy.set_param("kalman/initialZ", transform.transform.translation.z)
         update_params(["kalman/initialX", "kalman/initialY", "kalman/initialZ"])
 
@@ -33,7 +35,7 @@ def onNewTransform(transform):
 
 if __name__ == '__main__':
     rospy.init_node('publish_external_position_vicon', anonymous=True)
-    topic = rospy.get_param("~topic", "/vicon/cf/cf")
+    topic = rospy.get_param("~topic", "/crazyflie/cf/cf")
 
     rospy.wait_for_service('update_params')
     rospy.loginfo("found update_params service")
@@ -49,3 +51,5 @@ if __name__ == '__main__':
     rospy.Subscriber(topic, TransformStamped, onNewTransform)
 
     rospy.spin()
+
+    rospy.

@@ -3,6 +3,7 @@
 <launch>
   <arg name="uri" default="radio://0/80/250K/E7E7E7E7E7" />
   <arg name="tf_prefix" default="crazyflie" />
+  <arg name="joy_input" default="/dev/input/js0" />
   <include file="$(find crazyflie_driver)/launch/crazyflie_server.launch">
   </include>
 
@@ -21,18 +22,24 @@
     </node>
 
     <!--Controller Node-->
-    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="test_high_level.py" output="screen"/> 
-
+    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="joystick.py" output="screen"/> 
+    
   </group>
- 
+
+   <!--Joystic-->
+  <node name="joy" pkg="joy" type="joy_node" output="screen">
+    <param name="dev" value="$(arg joy_input)"/>
+  </node>
+
   <!-- Ball Detection Node-->
   <include file="$(find ball_detection)/src/ball_detection.launch">
     <arg name="flight" value="True"/>
   </include>
 
+
   <!--Rosbag-->
-  <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget /crazyflie/external_position_
-  /Debug/color/image /tf"
+  <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget /crazyflie/external_position
+  /Debug/color/image /tf /rosout" 
   name="record" output="screen"/>
 
 </launch>
