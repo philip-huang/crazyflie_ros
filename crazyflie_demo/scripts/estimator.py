@@ -58,7 +58,7 @@ if __name__ == "__main__":
             msg.point.x = trans[0]
             msg.point.y = trans[1]
             msg.point.z = trans[2] 
-            pub.publish(msg)
+            # pub.publish(msg)
             now_time = msg.header.stamp.secs + msg.header.stamp.nsecs * (10 ** -9) 
             
             if (not firstTransform) and (now_time - last_update_time) > 1:

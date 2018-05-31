@@ -20,7 +20,7 @@ def joy_cb(msg):
 
 def load_params():
     config = {}
-    config["target_height"] = rospy.get_param("~target_height", 0.2)
+    config["target_height"] = rospy.get_param("~target_height", 0.5)
     config["takeoff_speed"] = rospy.get_param("~takeoff_speed", 1)
     config["landing_speed"] = rospy.get_param("~landing_speed", 0.5)
     config["Goto_speed"] = rospy.get_param("~goto_speed", 1)
@@ -83,6 +83,14 @@ class DroneState:
             rospy.loginfo("Go {} m in y direction".format(msg.axes[7] * 0.1))
             drone_position = [0, msg.axes[7] * 0.1, 0]
             return DroneState.Goto
+        elif msg.buttons[4] == 1 and state == DroneState.Hover:
+            rospy.loginfo("Go -0.1 m in z direction")
+            drone_position = [0, 0, -0.1]
+            return DroneState.Goto
+        elif msg.buttons[5] == 1 and state == DroneState.Hover:
+            rospy.loginfo("Go 0.1 m in z direction")
+            drone_position = [0, 0, 0.1]
+            return DroneState.Goto
         else:
             # Void Joystick command
             return -1
@@ -105,12 +113,12 @@ if __name__ == '__main__':
         if last_joy_msg != None:
             new_state = DroneState.joy_nextstate(state, last_joy_msg) 
             if new_state == DroneState.Taking_Off:
-                current_action_duration = config["target_height"] * config["takeoff_speed"]
+                current_action_duration = config["target_height"] / config["takeoff_speed"]
                 cf.takeoff(targetHeight = config["target_height"], 
                             duration = current_action_duration)
 
             elif new_state == DroneState.Landing:
-                current_action_duration = config["landing_speed"] * config["target_height"]
+                current_action_duration = config["target_height"] / config["landing_speed"]
                 cf.land(targetHeight = 0.0, duration = current_action_duration) 
             elif new_state == DroneState.Emergency:
                 cf.land(targetHeight = 0.0, duration = 0.5)
