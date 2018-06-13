@@ -23,27 +23,10 @@
     </node>
 
     <!--Controller Node-->
-    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="joystick.py" output="screen">
-      <rosparam command="load" file="$(find ball_detection)/src/joystick.yaml" />
+    <node name="crazyflie_demo_hover" pkg="crazyflie_demo" type="test_high_level.py" output="screen"> 
     </node> 
     
-  </group>
-
-   <!--Joystic-->
-  <node name="joy" pkg="joy" type="joy_node" output="screen">
-    <param name="dev" value="$(arg joy_input)"/>
-  </node>
-
-  <!-- Ball Detection Node--> 
-  <include file="$(find ball_detection)/src/ball_detection.launch">
-    <arg name="flight" value="True"/>
-    <arg name="external_position_name" value="$(arg external_position_name)"/>
-  </include> 
-
-  <!-- Target Detection Node--> 
-  <include file="$(find ball_detection)/src/target_detection.launch">
-    <arg name="flight" value="True"/> 
-  </include> 
+  </group> 
 
   <!--Rosbag-->
   <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget $(arg external_position_name)

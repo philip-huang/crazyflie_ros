@@ -4,7 +4,7 @@ import rospy
 import numpy as np
 from crazyflie_driver.srv import *
 import tf
-from crazyflie_driver.msg import TrajectoryPolynomialPiece 
+from crazyflie_driver.msg import TrajectoryPolynomialPiece, Position
 
 def arrayToGeometryPoint(a):
     return geometry_msgs.msg.Point(a[0], a[1], a[2])
@@ -13,6 +13,7 @@ class Crazyflie:
     def __init__(self, prefix, cf_frame):
         self.prefix = prefix
         self.cf_frame = cf_frame
+        self.listener = tf.TransformListener()
 
         rospy.loginfo("Waiting for Services")
         rospy.wait_for_service(prefix + "/set_group_mask")
@@ -31,9 +32,12 @@ class Crazyflie:
         self.startTrajectoryService = rospy.ServiceProxy(prefix + "/start_trajectory", StartTrajectory)
         rospy.wait_for_service(prefix + "/update_params")
         self.updateParamsService = rospy.ServiceProxy(prefix + "/update_params", UpdateParams)
-        rospy.loginfo("Found All Required Services for " + self.prefix)
- 
-        
+        rospy.loginfo("Found All Required Services for " + self.prefix) 
+        rospy.Subscriber((prefix + "/target_position"), geometry_msgs.msg.PointStamped, self.subTarget) 
+
+        # Position Waypoint
+        self.target = [0, 0, 0]
+
     def setGroupMask(self, groupMask):
         self.setGroupMaskService(groupMask)
 
@@ -65,13 +69,15 @@ class Crazyflie:
     def startTrajectory(self, trajectoryId, timescale = 1.0, reverse = False, relative = True, groupMask = 0):
         self.startTrajectoryService(groupMask, trajectoryId, timescale, reverse, relative)
 
-    def position(self): 
-        listener = tf.TransformListener()
-        while not listener.frameExists(self.cf_frame):  
-            continue
-        t = listener.getLatestCommonTime("/world", self.cf_frame)
-        trans, roat = listener.lookupTransform("/world", self.cf_frame, t) 
-        return np.array(trans)
+    def position(self):  
+        try:           
+            t = self.listener.getLatestCommonTime("/world", self.cf_frame) 
+            trans, roat = self.listener.lookupTransform("/world", self.cf_frame, t) 
+            return np.array(trans)
+        except(tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            rospy.logwarn("External Position Feedback of the Crazyflie is unavailable")
+
+        return np.zeros(3)
 
     def getParam(self, name):
         return rospy.get_param(self.prefix + "/" + name)
@@ -90,3 +96,15 @@ class Crazyflie:
         rospy.sleep(0.3)
         self.setParam("kalman/resetEstimation", 0) 
         rospy.sleep(2)  
+     
+    def subTarget(self, msg):
+        self.target = [msg.point.x, msg.point.y, msg.point.z]
+    
+    def ready_to_auto_land(self):
+        diff = self.position()-self.target
+        if np.abs(diff[0]) < 0.03 and np.abs(diff[1]) < 0.03 and diff[2] < 0.03:
+            return True
+        else:
+            return False
+
+    

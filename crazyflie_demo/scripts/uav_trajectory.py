@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
+import rospkg
+import os
 
 def normalize(v):
   norm = np.linalg.norm(v)
@@ -88,9 +90,10 @@ class Trajectory:
   def __init__(self):
     self.polynomials = None
     self.duration = None
-
+    self.rospack = rospkg.RosPack()
+    self.pkg_path = self.rospack.get_path('crazyflie_demo') 
   def loadcsv(self, filename):
-    data = np.loadtxt(filename, delimiter=",", skiprows=1, usecols=range(33))
+    data = np.loadtxt(os.path.join(self.pkg_path, "scripts",filename), delimiter=",", skiprows=1, usecols=range(33))
     self.polynomials = [Polynomial4D(row[0], row[1:9], row[9:17], row[17:25], row[25:33]) for row in data]
     self.duration = np.sum(data[:,0])
 
