@@ -26,6 +26,7 @@ def load_params():
     config["landing_speed"] = rospy.get_param("~landing_speed", 0.5)
     config["Goto_speed"] = rospy.get_param("~goto_speed", 1)
     config["step_distance"] = rospy.get_param("~step_distance", 0.2)
+    config["target_durations"] = rospy.get_param("~target_durations", [5, 0.5])
     return config
 
 class DroneState:
@@ -37,6 +38,7 @@ class DroneState:
     Goto = 4
     Emergency = 5
     Pursuing = 6
+    PursueNext = 7
 
     flow_deck_on = True
 
@@ -64,9 +66,8 @@ class DroneState:
         if state == DroneState.Hover:
             return DroneState.Hover
         if state == DroneState.Pursuing: 
-            if cf.ready_to_auto_land():
-                cf.stop()
-                return DroneState.Idle
+            if (action_start_time + current_action_duration) < get_time():
+                return DroneState.PursueNext  
             else:
                 return DroneState.Pursuing
         
@@ -78,7 +79,7 @@ class DroneState:
             return DroneState.Emergency
         elif msg.buttons[3] == 1 and (state == DroneState.Goto or state == DroneState.Pursuing):
             flow_deck_on = True
-            cf.setParam("motion/disable", 0)
+            cf.setParam("motion/disablez", 0)
             rospy.loginfo("Hover Requested")
             return DroneState.Hover
         elif msg.buttons[0] == 1 and state == DroneState.Idle:
@@ -113,9 +114,9 @@ class DroneState:
                 cf.setParam("motion/disable", 0)
                 rospy.loginfo("Switch Flow Deck ON")
             else:    
-                cf.setParam("motion/disable", 1)
-                rospy.loginfo("switch Flow Deck OFF")
-            return state 
+                cf.setParam("motion/disable", 1) 
+                rospy.loginfo("Switch Flow Deck OFF")
+            return -1 
         else:
             # Void Joystick command
             return -1
@@ -131,8 +132,7 @@ if __name__ == '__main__':
     cf.setParam("commander/enHighLevel", 1)
     cf.reset_ekf() 
     rospy.loginfo("Finish Setting up Crazyflie. Ready to take off...")
-    state = DroneState.Idle
-    
+    state = DroneState.Idle 
 
     while(not rospy.is_shutdown()):  
         if last_joy_msg != None:
@@ -155,8 +155,9 @@ if __name__ == '__main__':
                 current_action_duration = 0.2
                 cf.goTo(drone_position, 0, current_action_duration, relative = True) 
             elif new_state == DroneState.Pursuing:
-                pursue_duration = 5
-                cf.goTo(cf.target, 0, pursue_duration,relative = False)
+                cf.setTargets([[cf.target[0], cf.target[1], cf.target[2] + 0.35, config["target_durations"][0]], 
+                               [cf.target[0], cf.target[1], cf.target[2] + 0.1, config["target_durations"][1]]] )
+                current_action_duration = cf.goTarget(next = True) 
             last_joy_msg = None
 
             if new_state != -1:
@@ -164,4 +165,19 @@ if __name__ == '__main__':
             action_start_time = get_time()
  
         else:
-            state = DroneState.default_nextstate(state) 
+            new_state = DroneState.default_nextstate(state) 
+            if new_state == DroneState.PursueNext: 
+                current_action_duration = cf.goTarget(next = True)
+                if current_action_duration == 0: 
+                    cf.stop()
+                    state = DroneState.Idle
+                else:
+                    state = DroneState.Pursuing
+                    action_start_time = get_time()
+            elif new_state == DroneState.Hover:
+                # cf.goTo([0, 0, 0], 0, 0.01, relative = True)
+                state = new_state
+            else:
+                state = new_state
+            
+            

@@ -102,9 +102,27 @@ class Crazyflie:
     
     def ready_to_auto_land(self):
         diff = self.position()-self.target
-        if np.abs(diff[0]) < 0.03 and np.abs(diff[1]) < 0.03 and diff[2] < 0.03:
+        if np.abs(diff[0]) < 0.15 and np.abs(diff[1]) < 0.15 and diff[2] < 0.15:
+            rospy.loginfo("Arrived Target! Signal rotor to shut down")
             return True
         else:
             return False
 
+    def setTargets(self, targets):
+        self.all_targets = targets
+        self.next_target_number = 0
+
+    def goTarget(self, next = False):
+        if self.next_target_number >= len(self.all_targets):
+            rospy.loginfo("Signal rotor to shut down")
+            return 0
+        next_target = self.all_targets[self.next_target_number]
+        duration = next_target[3]
+        #   .....  Position  .......... Duration
+        self.goTo(next_target[:3], 0, duration, relative = False)
+        rospy.loginfo("Pursing Next Target at x:{}, y:{}, z:{}, duration:{}s".format(next_target[0], \
+            next_target[1], next_target[2], duration))
+        self.next_target_number += 1
+
+        return duration
     

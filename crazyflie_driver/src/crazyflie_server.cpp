@@ -876,7 +876,7 @@ private:
       req.enable_logging_magnetic_field,
       req.enable_logging_pressure,
       req.enable_logging_battery,
-      req.enable_logging_packets);
+      req.enable_logging_packets); 
 
     m_crazyflies[req.uri] = cf;
 

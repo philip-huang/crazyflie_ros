@@ -5,6 +5,8 @@
   <arg name="tf_prefix" default="crazyflie" />
   <arg name="joy_input" default="/dev/input/js0" />
   <arg name="external_position_name" default="/crazyflie/external_position"/>
+  <arg name="camera_height" default="0.635"/>
+
   <include file="$(find crazyflie_driver)/launch/crazyflie_server.launch">
   </include>
 
@@ -14,9 +16,10 @@
       <param name="uri" value="$(arg uri)" />
       <param name="tf_prefix" value="$(arg tf_prefix)" /> 
       <rosparam>
-        genericLogTopics: ["position", "ctrltarget", "extpos"]
-        genericLogTopicFrequencies: [10, 10, 10] 
+        genericLogTopics: ["position", "velocity", "ctrltarget", "extpos"]
+        genericLogTopicFrequencies: [10, 10, 10, 10] 
         genericLogTopic_position_Variables: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z"] 
+        genericLogTopic_velocity_Variables: ["stateEstimate.vx", "stateEstimate.vy", "stateEstimate.vz"] 
         genericLogTopic_ctrltarget_Variables: ["ctrltarget.x", "ctrltarget.y", "ctrltarget.z"]
         genericLogTopic_extpos_Variables: ["ext_pos.X", "ext_pos.Y", "ext_pos.Z"]
       </rosparam>
@@ -38,11 +41,13 @@
   <include file="$(find ball_detection)/src/ball_detection.launch">
     <arg name="flight" value="True"/>
     <arg name="external_position_name" value="$(arg external_position_name)"/>
+    <arg name="camera_height" value="$(arg camera_height)"/>
   </include> 
 
   <!-- Target Detection Node--> 
   <include file="$(find ball_detection)/src/target_detection.launch">
     <arg name="flight" value="True"/> 
+    <arg name="camera_height" value="$(arg camera_height)"/>
   </include> 
 
   <!--Rosbag-->
