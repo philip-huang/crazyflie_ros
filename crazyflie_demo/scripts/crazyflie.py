@@ -3,6 +3,7 @@
 import rospy
 import numpy as np
 from crazyflie_driver.srv import *
+from std_msgs.msg import Float32MultiArray
 import tf
 from crazyflie_driver.msg import TrajectoryPolynomialPiece, Position
 
@@ -33,10 +34,11 @@ class Crazyflie:
         rospy.wait_for_service(prefix + "/update_params")
         self.updateParamsService = rospy.ServiceProxy(prefix + "/update_params", UpdateParams)
         rospy.loginfo("Found All Required Services for " + self.prefix) 
-        rospy.Subscriber((prefix + "/target_position"), geometry_msgs.msg.PointStamped, self.subTarget) 
+        rospy.Subscriber((prefix + "/target_position"), Float32MultiArray, self.subTarget) 
 
         # Position Waypoint
         self.target = [0, 0, 0]
+        self.home_position = [0.2, 0.4, 0.6]
 
     def setGroupMask(self, groupMask):
         self.setGroupMaskService(groupMask)
@@ -92,13 +94,17 @@ class Crazyflie:
         self.updateParamsService(params.keys())
 
     def reset_ekf(self):
+        #self.setParam("kalman/initialX", 0)
+        #self.setParam("kalman/initialY", 0.5)
+        #self.setParam("kalman/initialZ", 0)
         self.setParam("kalman/resetEstimation", 1)
-        rospy.sleep(0.3)
+        rospy.sleep(0.3)         
         self.setParam("kalman/resetEstimation", 0) 
         rospy.sleep(2)  
      
     def subTarget(self, msg):
-        self.target = [msg.point.x, msg.point.y, msg.point.z]
+        self.num_target = len(msg.data)//3
+        self.target = [[msg.data[3 * i + j] for j in range(3)] for i in range(self.num_target)]
     
     def ready_to_auto_land(self):
         diff = self.position()-self.target
@@ -114,14 +120,26 @@ class Crazyflie:
 
     def goTarget(self, next = False):
         if self.next_target_number >= len(self.all_targets):
-            rospy.loginfo("Signal rotor to shut down")
+            rospy.loginfo("No more targets!")
             return 0
+        
         next_target = self.all_targets[self.next_target_number]
-        duration = next_target[3]
-        #   .....  Position  .......... Duration
-        self.goTo(next_target[:3], 0, duration, relative = False)
-        rospy.loginfo("Pursing Next Target at x:{}, y:{}, z:{}, duration:{}s".format(next_target[0], \
-            next_target[1], next_target[2], duration))
+        
+        if next_target[0] == 'Stop':
+            rospy.loginfo("Signal rotor to shut down")
+            self.stop()
+            duration = next_target[1]
+        
+        else:
+            duration = next_target[3]
+            if self.all_targets[self.next_target_number-1][0] == 'Stop': 
+                # need to re take off (go to service wont work)
+                self.takeoff(next_target[2], duration)
+            else:
+                #   .....  Position  .......... Duration
+                self.goTo(next_target[:3], 0, duration, relative = False)
+            rospy.loginfo("Pursing Next Target at x:{}, y:{}, z:{}, duration:{}s".format(next_target[0], \
+                            next_target[1], next_target[2], duration))
         self.next_target_number += 1
 
         return duration

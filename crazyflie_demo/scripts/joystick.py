@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+"""
+Behaviorial Finate State Machine of the Crazyflie
+Change State can be manually triggered by joystick 
+    or automatically triggered by the FSM
+
+Author: Philip Huang
+Contact: philipyizhou.huang@mail.utoronto.ca
+
+"""
 
 import rospy
 import crazyflie
@@ -10,6 +19,7 @@ current_action_duration = 0.0
 action_start_time = 0.0
 drone_position = [0, 0, 0]  
 flow_deck_on = True  
+ext_pos_on = False
 
 def get_time():
     t = rospy.get_rostime()
@@ -27,10 +37,43 @@ def load_params():
     config["Goto_speed"] = rospy.get_param("~goto_speed", 1)
     config["step_distance"] = rospy.get_param("~step_distance", 0.2)
     config["target_durations"] = rospy.get_param("~target_durations", [5, 0.5])
+    config["target_steps"] = rospy.get_param("~target_steps",[[0, 0, 0.5], [0, 0, 0.1]]) 
+    #print(config["target_durations"])
+    if len(config["target_durations"]) != len(config["target_steps"]):
+        rospy.logerr("Target durations and steps have inconsistent lengths!")
+        assert len(config["target_durations"]) == len(config["target_steps"])
+    for i in range(len(config["target_durations"])):
+        duration = config["target_durations"][i]
+        step = config["target_steps"][i]
+        if len(step) != len(duration):
+            assert len(step) != len(duration)
+
     return config
 
+
+def setTargetSteps(steps, durations):
+    num_target = len(steps)
+        
+    targets = []
+    for j in range(num_target):
+        for i, step in enumerate(steps[j]):
+            if step == 'Stop':
+                target = ['Stop', durations[j][i]]
+            elif step == 'Hover':
+                target = [cf.target[j][k] for k in range(3)]
+                target.append(durations[j][i])
+            elif step == 'Home':
+                target = [cf.home_position[k] for k in range(3)]
+                target.append(durations[j][i])
+            else:
+                target = [cf.target[j][k] + step[k] for k in range(3)]
+                target.append(durations[j][i]) 
+            targets.append(target)
+    return targets
+
+
 class DroneState:
-    # Like enum in c ++ 
+    # Like enum in c++ 
     Idle = 0
     Taking_Off = 1
     Hover = 2
@@ -73,7 +116,7 @@ class DroneState:
         
     @staticmethod
     def joy_nextstate(state, msg):
-        global drone_position, flow_deck_on
+        global drone_position, flow_deck_on, ext_pos_on
         if msg.buttons[2] == 1:
             rospy.logfatal("Emergency Requested! Prepare to land....")
             return DroneState.Emergency
@@ -108,6 +151,16 @@ class DroneState:
         elif msg.buttons[7] == 1 and state == DroneState.Hover:
             rospy.loginfo("Start Pursuing Target")
             return DroneState.Pursuing
+        elif msg.buttons[9] == 1:
+            ext_pos_on = not ext_pos_on
+            if ext_pos_on:
+                cf.setParam("locSrv/useExtPos", 1)
+                rospy.loginfo("Locoalization from Camera ON")
+                
+            else:
+                cf.setParam("locSrv/useExtPos", 0)
+                rospy.loginfo("Locoalization from Camera OFF")
+            return -1
         elif msg.buttons[10] == 1: 
             flow_deck_on = not flow_deck_on
             if flow_deck_on:
@@ -130,7 +183,12 @@ if __name__ == '__main__':
     # Connecting to Crazyflie
     cf = crazyflie.Crazyflie("/crazyflie", "crazyflie/base_link")  
     cf.setParam("commander/enHighLevel", 1)
+    cf.setParam("locSrv/useExtPos", 0)
     cf.reset_ekf() 
+    print(config["target_durations"])
+    print(config["target_steps"])
+    print(cf.target) 
+    # setTargetSteps(config['target_steps'], config['target_durations'])
     rospy.loginfo("Finish Setting up Crazyflie. Ready to take off...")
     state = DroneState.Idle 
 
@@ -155,8 +213,7 @@ if __name__ == '__main__':
                 current_action_duration = 0.2
                 cf.goTo(drone_position, 0, current_action_duration, relative = True) 
             elif new_state == DroneState.Pursuing:
-                cf.setTargets([[cf.target[0], cf.target[1], cf.target[2] + 0.35, config["target_durations"][0]], 
-                               [cf.target[0], cf.target[1], cf.target[2] + 0.1, config["target_durations"][1]]] )
+                cf.setTargets(setTargetSteps(config['target_steps'], config['target_durations']))
                 current_action_duration = cf.goTarget(next = True) 
             last_joy_msg = None
 
@@ -168,9 +225,8 @@ if __name__ == '__main__':
             new_state = DroneState.default_nextstate(state) 
             if new_state == DroneState.PursueNext: 
                 current_action_duration = cf.goTarget(next = True)
-                if current_action_duration == 0: 
-                    cf.stop()
-                    state = DroneState.Idle
+                if current_action_duration == 0:  
+                    state = DroneState.Hover
                 else:
                     state = DroneState.Pursuing
                     action_start_time = get_time()

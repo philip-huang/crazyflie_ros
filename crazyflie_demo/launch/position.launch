@@ -52,7 +52,7 @@
 
   <!--Rosbag-->
   <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget $(arg external_position_name)
-  /Debug/color/image/compressed /tf /rosout" 
+  /Debug/color/image/compressed /Debug/target/image/compressed /crazyflie/target_position /tf /rosout" 
   name="record" output="screen"/>
 
 </launch>
