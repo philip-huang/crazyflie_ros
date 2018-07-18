@@ -5,7 +5,7 @@
   <arg name="tf_prefix" default="crazyflie" />
   <arg name="joy_input" default="/dev/input/js0" />
   <arg name="external_position_name" default="/crazyflie/external_position"/>
-  <arg name="camera_height" default="0.635"/>
+  <arg name="camera_height" default="0.84"/>
 
   <include file="$(find crazyflie_driver)/launch/crazyflie_server.launch">
   </include>
@@ -16,12 +16,11 @@
       <param name="uri" value="$(arg uri)" />
       <param name="tf_prefix" value="$(arg tf_prefix)" /> 
       <rosparam>
-        genericLogTopics: ["position", "velocity", "ctrltarget", "extpos"]
-        genericLogTopicFrequencies: [10, 10, 10, 10] 
-        genericLogTopic_position_Variables: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z"] 
-        genericLogTopic_velocity_Variables: ["stateEstimate.vx", "stateEstimate.vy", "stateEstimate.vz"] 
-        genericLogTopic_ctrltarget_Variables: ["ctrltarget.x", "ctrltarget.y", "ctrltarget.z"]
-        genericLogTopic_extpos_Variables: ["ext_pos.X", "ext_pos.Y", "ext_pos.Z"]
+        genericLogTopics: ["position", "ctrltarget", "zrange"]
+        genericLogTopicFrequencies: [10, 10, 100] 
+        genericLogTopic_position_Variables: ["stateEstimate.x", "stateEstimate.y", "stateEstimate.z"]  
+        genericLogTopic_ctrltarget_Variables: ["ctrltarget.x", "ctrltarget.y", "ctrltarget.z"] 
+        genericLogTopic_zrange_Variables: ["range.zrange"]
       </rosparam>
     </node>
 
@@ -52,7 +51,12 @@
 
   <!--Rosbag-->
   <node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /crazyflie/position /crazyflie/ctrltarget $(arg external_position_name)
-  /Debug/color/image/compressed /Debug/target/image/compressed /crazyflie/target_position /tf /rosout" 
-  name="record" output="screen"/>
+  /Debug/color/image/compressed /Debug/target/image/compressed /crazyflie/target_position /crazyflie/raw_position /crazyflie/zrange 
+  /crazyflie/expected_depth /rosout" 
+  name="record" output="screen"/> 
+
+  <!--node pkg="rosbag" type="record" args="-o /home/philip/crazyflie_dev/rosbags/cf /camera/color/image_raw /camera/aligned_depth_to_color/image_raw
+  /crazyflie/raw_position /Debug/color/image"
+   name="record" output="screen"/ -->
 
 </launch>

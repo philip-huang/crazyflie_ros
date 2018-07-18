@@ -37,8 +37,7 @@ class Crazyflie:
         rospy.Subscriber((prefix + "/target_position"), Float32MultiArray, self.subTarget) 
 
         # Position Waypoint
-        self.target = [0, 0, 0]
-        self.home_position = [0.2, 0.4, 0.6]
+        self.target = None
 
     def setGroupMask(self, groupMask):
         self.setGroupMaskService(groupMask)
@@ -125,6 +124,18 @@ class Crazyflie:
         
         next_target = self.all_targets[self.next_target_number]
         
+        if next_target == 'CamON':
+            self.setParam("locSrv/useExtPos", 1)
+            rospy.loginfo("Locoalization from Camera AUTO ON")
+            self.next_target_number += 1
+            next_target = self.all_targets[self.next_target_number]
+        elif next_target == 'CamOFF':
+            self.setParam("locSrv/useExtPos", 0)
+            rospy.loginfo("Locoalization from Camera AUTO OFF")
+            self.next_target_number += 1
+            next_target = self.all_targets[self.next_target_number]
+
+
         if next_target[0] == 'Stop':
             rospy.loginfo("Signal rotor to shut down")
             self.stop()

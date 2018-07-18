@@ -13,6 +13,7 @@ import rospy
 import crazyflie
 import time
 from sensor_msgs.msg import Joy
+from std_srvs.srv import Empty
 
 last_joy_msg = None
 current_action_duration = 0.0
@@ -29,15 +30,31 @@ def joy_cb(msg):
     global last_joy_msg
     last_joy_msg = msg
 
+def detect_target():
+    try:
+        if config["use_qr_code"]:
+            detectTarget = rospy.ServiceProxy("/detect_qrcode", Empty)
+        else:
+            detectTarget = rospy.ServiceProxy("/detect_sunflower", Empty)
+        ok = detectTarget() 
+        return ok
+    except rospy.service.ServiceException as e:
+        rospy.logwarn("Target Detection Service did not process request" + str(e))
+        return False    
+    
+
 def load_params():
     config = {}
     config["target_height"] = rospy.get_param("~target_height", 0.5)
+    config["takeoff_point"] = rospy.get_param("~takeoff_point", [-0.6, 0, 0.7, 2])
     config["takeoff_speed"] = rospy.get_param("~takeoff_speed", 0.5)
     config["landing_speed"] = rospy.get_param("~landing_speed", 0.5)
     config["Goto_speed"] = rospy.get_param("~goto_speed", 1)
     config["step_distance"] = rospy.get_param("~step_distance", 0.2)
     config["target_durations"] = rospy.get_param("~target_durations", [5, 0.5])
     config["target_steps"] = rospy.get_param("~target_steps",[[0, 0, 0.5], [0, 0, 0.1]]) 
+    config["home_position"] = rospy.get_param("~home_position", [0, 0.5, 0.6])
+    config["use_qr_code"] = rospy.get_param("~use_qr_code", True)
     #print(config["target_durations"])
     if len(config["target_durations"]) != len(config["target_steps"]):
         rospy.logerr("Target durations and steps have inconsistent lengths!")
@@ -53,23 +70,36 @@ def load_params():
 
 def setTargetSteps(steps, durations):
     num_target = len(steps)
-        
+  
     targets = []
-    for j in range(num_target):
-        for i, step in enumerate(steps[j]):
-            if step == 'Stop':
-                target = ['Stop', durations[j][i]]
-            elif step == 'Hover':
-                target = [cf.target[j][k] for k in range(3)]
-                target.append(durations[j][i])
-            elif step == 'Home':
-                target = [cf.home_position[k] for k in range(3)]
-                target.append(durations[j][i])
-            else:
-                target = [cf.target[j][k] + step[k] for k in range(3)]
-                target.append(durations[j][i]) 
-            targets.append(target)
-    return targets
+    if cf.target == None:
+        rospy.logwarn("No targets stored in the crazyflie.py client!")
+        return targets
+    try:
+        for j in range(num_target):
+            for i, step in enumerate(steps[j]):
+                if step == 'Stop':
+                    target = ['Stop', durations[j][i]]
+                elif step == 'Hover':
+                    target = [cf.target[j][k] for k in range(3)]
+                    target.append(durations[j][i])
+                elif step == 'Home':
+                    target = config['home_position'][:]
+                    target.append(durations[j][i])
+                elif type(step) == str and step.lower() == 'camoff':
+                    target = 'CamOFF'
+                elif type(step) == str and step.lower() == 'camon':
+                    target = 'CamON'
+                else:
+                    target = [cf.target[j][k] + step[k] for k in range(3)]
+                    target.append(durations[j][i]) 
+                targets.append(target)
+    except:
+        rospy.logfatal("Parsing Target sequences from YAML file failed!")
+        return []
+    else:
+        rospy.loginfo("Target sequenced loaded from YAML file successfully")
+        return targets
 
 
 class DroneState:
@@ -90,10 +120,10 @@ class DroneState:
         if state == DroneState.Idle:
             return DroneState.Idle
         if state == DroneState.Taking_Off:
-            if (action_start_time + current_action_duration) > get_time(): 
+            if (action_start_time + current_action_duration) > get_time():
                 return DroneState.Taking_Off
             else: 
-                return DroneState.Hover
+                return DroneState.Goto
         if state == DroneState.Landing:
             if (action_start_time + current_action_duration) > get_time():
                 return DroneState.Landing
@@ -122,7 +152,7 @@ class DroneState:
             return DroneState.Emergency
         elif msg.buttons[3] == 1 and (state == DroneState.Goto or state == DroneState.Pursuing):
             flow_deck_on = True
-            cf.setParam("motion/disablez", 0)
+            #cf.setParam("motion/disablez", 0)
             rospy.loginfo("Hover Requested")
             return DroneState.Hover
         elif msg.buttons[0] == 1 and state == DroneState.Idle:
@@ -149,12 +179,19 @@ class DroneState:
             drone_position = [0, 0, config["step_distance"]]
             return DroneState.Goto
         elif msg.buttons[7] == 1 and state == DroneState.Hover:
-            rospy.loginfo("Start Pursuing Target")
-            return DroneState.Pursuing
+            if detect_target(): 
+                rospy.sleep(0.3)
+                rospy.loginfo("Start Pursuing Target")
+                return DroneState.Pursuing
+            else:
+                rospy.logwarn("Target not detected!")
+                return DroneState.Hover
         elif msg.buttons[9] == 1:
             ext_pos_on = not ext_pos_on
             if ext_pos_on:
                 cf.setParam("locSrv/useExtPos", 1)
+                resetBallDetector = rospy.ServiceProxy("/reset_ball_detection", Empty)
+                resetBallDetector()                
                 rospy.loginfo("Locoalization from Camera ON")
                 
             else:
@@ -232,6 +269,11 @@ if __name__ == '__main__':
                     action_start_time = get_time()
             elif new_state == DroneState.Hover:
                 # cf.goTo([0, 0, 0], 0, 0.01, relative = True)
+                state = new_state
+            elif new_state == DroneState.Goto and state == DroneState.Taking_Off:
+                current_action_duration = config['takeoff_point'][3]
+                cf.goTo(config['takeoff_point'][:3], 0, current_action_duration, relative = True)
+                action_start_time = get_time()
                 state = new_state
             else:
                 state = new_state
